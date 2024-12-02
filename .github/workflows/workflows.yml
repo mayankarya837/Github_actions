@@ -1,0 +1,56 @@
+name: practice Project 1
+on: [push, workflow_dispatch] # Events
+jobs:
+    test:
+        runs-on: ubuntu-latest # Runners
+        steps:
+        - name: checkout
+          uses: actions/checkout@v4
+        - name: install nodejs
+          uses: actions/setup-node@v4
+          with:
+            node-version: '14'
+        - name: install dependencies
+          run: npm ci
+        - name: Run Test
+          run: |
+                npm help
+                npm test
+    lint:
+        needs: test #depends on the above job
+        runs-on: ubuntu-latest
+        steps:
+        - name: checkout
+          uses: actions/checkout@v4
+        - name: install nodejs
+          uses: actions/setup-node@v4
+          with:
+            node-version: '14'
+        - name: install dependencies
+          run: npm ci
+        - name: Run Lint
+          run: |
+                
+                npm run lint
+
+    deploy:
+        needs: lint #depends on the above job
+        runs-on: ubuntu-latest
+        steps:
+        - name: checkout
+          uses: actions/checkout@v4
+        - name: install nodejs
+          uses: actions/setup-node@v4
+          with:
+            node-version: '14'
+        - name: install dependencies
+          run: npm ci
+        - name: Build Project
+          run: |
+                npm run build
+                echo "Deploying......"
+        
+        
+
+
+    
