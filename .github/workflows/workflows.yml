@@ -23,10 +23,12 @@ jobs:
         - name: Run Test
           run: |
                 npm help
-                npm test
+                npm run test
     build:
         needs: test #depends on the above job
         runs-on: ubuntu-latest
+        outputs:
+          script-file: ${{steps.publish.outputs.script-file}} # reference the output of script file
         steps:
         - name: checkout
           uses: actions/checkout@v4
@@ -37,7 +39,7 @@ jobs:
         - name: install dependencies
           run: npm ci
         - name: Run build
-          run: npm build
+          run: npm run build
         - name: upload artifacts 
           uses: actions/upload-artifact@v4 #upload artifacts to github
           with:
@@ -45,6 +47,10 @@ jobs:
             path: | 
                 dist
                 package.json
+        - name: Publish JS File
+          id: publish
+          run : find dist/assets/*.js -type f -execdir echo 'script-file={}' >> $GITHUB_OUTPUT ';' # get the filename to use in nxt step deploy
+
 
     deploy:
         needs: build #depends on the above job
@@ -62,6 +68,8 @@ jobs:
           uses: actions/download-artifact@v4 # used the uploaded artifacts to the code
           with:
             name: dist-file
+        - name: Output Contexts
+          run: echo "${{needs.build.outputs.script-file}}" # reference to the above build process
         - name: Build Project
           run: |
                 ls
