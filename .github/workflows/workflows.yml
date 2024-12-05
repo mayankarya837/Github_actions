@@ -1,5 +1,13 @@
 name: practice Project 1
-on: [push, workflow_dispatch] # Events
+#on: [push, workflow_dispatch] # Events
+on: 
+    push:
+        branches:
+            - main
+            - 'dev_*' #using * meany any character other tha '/'
+            - 'feat/**' # uning ** meanin inclusing '/'
+        paths-ignore:
+            - '.gitbub/workflow/**' # ignore this path when push the code
 jobs:
     test:
         runs-on: ubuntu-latest # Runners
@@ -16,7 +24,7 @@ jobs:
           run: |
                 npm help
                 npm test
-    lint:
+    build:
         needs: test #depends on the above job
         runs-on: ubuntu-latest
         steps:
@@ -28,13 +36,18 @@ jobs:
             node-version: '14'
         - name: install dependencies
           run: npm ci
-        - name: Run Lint
-          run: |
-                
-                npm run lint
+        - name: Run build
+          run: npm build
+        - name: upload artifacts 
+          uses: actions/upload-artifact@v4 #upload artifacts to github
+          with:
+            name: dist-file
+            path: | 
+                dist
+                package.json
 
     deploy:
-        needs: lint #depends on the above job
+        needs: build #depends on the above job
         runs-on: ubuntu-latest
         steps:
         - name: checkout
@@ -45,9 +58,13 @@ jobs:
             node-version: '14'
         - name: install dependencies
           run: npm ci
+        - name: download Artifacts
+          uses: actions/download-artifact@v4 # used the uploaded artifacts to the code
+          with:
+            name: dist-file
         - name: Build Project
           run: |
-                npm run build
+                ls
                 echo "Deploying......"
         
         
