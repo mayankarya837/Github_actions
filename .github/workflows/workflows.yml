@@ -10,21 +10,39 @@ on:
             - '.gitbub/workflow/**' # ignore this path when push the code
 jobs:
     test:
-        runs-on: ubuntu-latest # Runners
+        strategy:
+          matrix:
+            node-version : [16]
+            os: [ubuntu-latest]
+        runs-on: ${{matrix.os}} # Runners
+        container:
+          image:  node:16
         steps:
         - name: checkout
-          uses: actions/checkout@v4
+          uses: actions/checkout@v3
         - name: install nodejs
-          uses: actions/setup-node@v4
+          uses: actions/setup-node@v3
           with:
-            node-version: '14'
+            node-version: ${{matrix.node-version}}
+        - name: Clear Node Modules and npm Cache
+          run: |
+             rm -rf node_modules
+             npm cache clean --force      
+           
         - name: cache dependicies
+          id: cache_id
           uses: actions/cache@v4
           with :
-            path: ~/.npm
-            key: deps-node-modules-${{hashFiles('**/package-lock.json')}} 
+            path: node_modules
+            #path: ~/.npm
+            key: ${{ runner.os }}-deps-node-modules-${{hashFiles('**/package-lock.json')}} 
         - name: install dependencies
-          run: npm ci
+        #if above cache step will not run then this stepp will be execute
+          if: steps.cache_id.outputs.cache-hit != 'true'
+          run: npm ci   
+        - name: Show npm Debug Log
+          continue-on-error : true
+          run: cat /home/runner/.npm/_logs/*-debug.log      
         - name: Run Test
           run: |
                 npm help
@@ -42,15 +60,22 @@ jobs:
           with:
             node-version: '14'
         - name: cache dependicies
+          id: cache_id
           uses: actions/cache@v4
           with :
-            path: ~/.npm
-            key: deps-node-modules-${{hashFiles('**/package-lock.json')}} 
+            path: node_modules
+            #path: ~/.npm
+            key: ${{ runner.os }}-deps-node-modules-${{hashFiles('**/package-lock.json')}}  
         - name: install dependencies
+          #if above cache step will not run then this stepp will be execute
+          if: steps.cache_id.outputs.cache-hit != 'true'
           run: npm ci
         - name: Run build
+          id: run-build
           run: npm run build
         - name: upload artifacts 
+        #match the outcome/conclusion string with failure, if matched then , run the this step, otherwise not
+          #if failure() && steps.run-build.conclusion == 'failure'  
           uses: actions/upload-artifact@v4 #upload artifacts to github
           with:
             name: dist-file
@@ -64,31 +89,63 @@ jobs:
 
     deploy:
         needs: build #depends on the above job
-        runs-on: ubuntu-latest
-        steps:
-        - name: checkout
-          uses: actions/checkout@v4
-        - name: install nodejs
-          uses: actions/setup-node@v4
-          with:
-            node-version: '14'
-        - name: cache dependicies
-          uses: actions/cache@v4
-          with :
-            path: ~/.npm
-            key: deps-node-modules-${{hashFiles('**/package-lock.json')}}     
-        - name: install dependencies
-          run: npm ci
-        - name: download Artifacts
-          uses: actions/download-artifact@v4 # used the uploaded artifacts to the code
-          with:
-            name: dist-file
-        - name: Output Contexts
-          run: echo "${{needs.build.outputs.script-file}}" # reference to the above build process
-        - name: Build Project
+        uses: ./.github/workflows/reusable.yml  #reffer to the resuable workflow file
+        with:
+          artifact-name: dist-file #provide the input file
+      #   runs-on: ubuntu-latest
+      #   steps:
+      #   - name: checkout
+      #     uses: actions/checkout@v4
+      #   - name: install nodejs
+      #     uses: actions/setup-node@v4
+      #     with:
+      #       node-version: '14'
+      #   - name: cache dependicies
+      #     id: cache_id
+      #     uses: actions/cache@v4
+      #     with :
+      #        path: node_modules
+      #        #path: ~/.npm
+      #        key: {{ runner.os }}-deps-node-modules-{{hashFiles('**/package-lock.json')}} 
+              
+      #   - name: install dependencies
+      #  #if above cache step will not run then this stepp will be execute
+      #     f: steps.cache_id.outputs.cache-hit != 'true'
+      #     run: npm ci
+      #   - name: download Artifacts
+      #     uses: actions/download-artifact@v4 # used the uploaded artifacts to the code
+      #     with:
+      #       name: dist-file
+      #   - name: Output Contexts
+      #     run: echo "{{needs.build.outputs.script-file}}" # reference to the above build process
+      #   - name: Build Project
+      #     run: |
+      #           ls
+      #           echo "Deploying......"
+
+    print-deploy-result:
+      needs: deploy
+      runs-on: ubuntu-latest
+      steps:
+        - name: print deploy output
+          run: echo "${{needs.deploy.outputs.result1}}"
+
+    #running parellel job for testing             
+    other_job:
+      runs-on: ubuntu-latest
+      steps:
+        - name: running Pallel Job
+          run: echo "running parallel job"   
+    #reportes will be dependent on deploy and parallel job, trigger if failures occured               
+    report:
+      needs: [deploy,other_job]
+      if: failure()
+      runs-on : ubuntu-latest
+      steps:
+        - name: Output Information
           run: |
-                ls
-                echo "Deploying......"
+            echo "Something Went Wrong"
+            echo "${{toJson(github)}}"
         
         
 

@@ -1,0 +1,50 @@
+name: Reusable workflow deply example
+on: 
+  workflow_call:
+    inputs: 
+      artifact-name: #getting the input file from main workflow file
+        description: provide the artifact to use
+        required: true
+        default: dist-file
+        type: string
+    outputs:
+      result1:
+        description: The result of deployment operation
+        value: ${{jobs.deploy.outputs.outcome}}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      outcome: ${{steps.deployid.outputs.set-result}}
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+    - name: install nodejs
+      uses: actions/setup-node@v4
+      with:
+        node-version: '14'
+    - name: cache dependicies
+      id: cache_id
+      uses: actions/cache@v4
+      with :
+         path: node_modules
+         #path: ~/.npm
+         key: ${{ runner.os }}-deps-node-modules-${{hashFiles('**/package-lock.json')}} 
+          
+    - name: install dependencies
+   #if above cache step will not run then this stepp will be execute
+      if: steps.cache_id.outputs.cache-hit != 'true'
+      run: npm ci
+    - name: download Artifacts
+      uses: actions/download-artifact@v4 # used the uploaded artifacts to the code
+      with:
+        name: ${{inputs.artifact-name}}
+    - name: Output Contexts
+      run: echo "${{needs.build.outputs.script-file}}" # reference to the above build process
+    - name: Build Project
+      run: |
+            ls
+            echo "Deploying......"
+    - name: Set Result Output
+      id: deployid
+      run: echo "set-result=SUCCESS" >> $GITHUB_OUTPUT
